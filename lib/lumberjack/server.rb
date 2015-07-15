@@ -47,6 +47,7 @@ module Lumberjack
     def run(&block)
       while true
         connection = accept
+        next unless connection
         Thread.new(connection) do |connection|
           connection.run(&block)
         end
@@ -55,12 +56,18 @@ module Lumberjack
 
     def accept(&block)
       begin
+        fd = nil
         fd = @ssl_server.accept
       rescue EOFError, OpenSSL::SSL::SSLError, IOError
         # ssl handshake or other accept-related failure.
         # TODO(sissel): Make it possible to log this.
-        retry
+        unless fd.nil?
+          fd.close rescue nil
+        end
+
+        return nil
       end
+
       if block_given?
         block.call(fd)
       else
